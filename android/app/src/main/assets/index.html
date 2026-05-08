@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0e17">
+<link rel="manifest" href="manifest.json">
+<title>DataFlow</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0e17;--surface:#111827;--card:#1a2235;--border:#1e2d4a;
+  --cyan:#00e5ff;--cyan2:#00b8d4;--text:#e0e6ed;--text2:#8899aa;
+  --green:#00e676;--red:#ff5252;--orange:#ffab40;
+  --radius:12px;--shadow:0 4px 24px rgba(0,229,255,0.08);
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+html,body{height:100%;font-family:-apple-system,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;touch-action:manipulation}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:var(--surface);border-bottom:1px solid var(--border);position:relative;z-index:100}
+.header h1{font-size:18px;font-weight:700;letter-spacing:2px;background:linear-gradient(135deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-actions{display:flex;gap:8px;align-items:center}
+
+/* Buttons */
+.btn{padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);cursor:pointer;font-size:13px;transition:all .15s;display:flex;align-items:center;gap:5px;white-space:nowrap;min-height:36px}
+.btn:active{transform:scale(0.96);border-color:var(--cyan);color:var(--cyan)}
+.btn-primary{background:linear-gradient(135deg,var(--cyan2),var(--cyan));color:#000;border:none;font-weight:600}
+.btn-primary:active{box-shadow:0 0 20px rgba(0,229,255,0.3)}
+.btn-icon{width:36px;height:36px;padding:0;justify-content:center;font-size:18px}
+.btn-danger{border-color:var(--red);color:var(--red)}
+.btn-danger:active{background:var(--red);color:#fff}
+.btn-sm{padding:6px 10px;font-size:12px;min-height:30px}
+
+/* Search Bar */
+.search-bar{display:flex;align-items:center;gap:6px}
+.search-bar input{padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:13px;width:130px}
+.search-bar input:focus{outline:none;border-color:var(--cyan)}
+
+/* Main Layout */
+.main{display:flex;flex-direction:column;height:calc(100vh - var(--safe-top))}
+
+/* Page Tabs */
+.page-tabs{display:flex;align-items:center;gap:4px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch}
+.page-tabs::-webkit-scrollbar{display:none}
+.page-tab{padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;transition:all .15s;color:var(--text2);border:1px solid transparent;position:relative;flex-shrink:0}
+.page-tab:active{color:var(--text);background:rgba(0,229,255,0.05)}
+.page-tab.active{color:var(--cyan);background:rgba(0,229,255,0.1);border-color:rgba(0,229,255,0.3)}
+.page-tab .tab-close{margin-left:4px;opacity:0.6;font-size:10px}
+.page-tab .tab-close:active{color:var(--red)}
+
+/* Content Area */
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px;padding-bottom:calc(12px + var(--safe-bottom));-webkit-overflow-scrolling:touch}
+.content::-webkit-scrollbar{display:none}
+
+/* Columns - vertical stack on mobile */
+.columns-list{display:flex;flex-direction:column;gap:12px}
+
+/* Column Card */
+.column-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;position:relative;transition:all .15s}
+.column-card:active{border-color:rgba(0,229,255,0.3)}
+.column-card .col-delete{position:absolute;top:6px;right:8px;width:22px;height:22px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:11px;border-radius:4px;display:flex;align-items:center;justify-content:center;z-index:2}
+.column-card .col-delete:active{color:var(--red);background:rgba(255,82,82,0.15)}
+
+/* Row layout - text and number side by side */
+.col-row{display:flex;gap:8px;align-items:flex-start}
+.col-row .col-left{flex:1;min-width:0}
+.col-row .col-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+
+/* Text Input */
+.input-group{position:relative}
+.text-input{width:90px;padding:7px 28px 7px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:13px;transition:all .15s;flex-shrink:0}
+.text-input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,229,255,0.1)}
+.text-history-btn{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:24px;height:24px;border:none;background:none;color:var(--text2);cursor:pointer;font-size:10px;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.text-history-btn:active{color:var(--cyan)}
+
+/* Expression above card */
+.col-expr{font-size:10px;color:var(--text2);text-align:center;word-break:break-all;line-height:1.3;max-height:52px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;margin-bottom:6px;min-height:14px}
+
+/* History Dropdown */
+.history-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-top:4px;max-height:140px;overflow-y:auto;z-index:50;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+.history-dropdown.show{display:block}
+.history-item{padding:8px 10px;font-size:12px;color:var(--text);cursor:pointer;transition:all .1s;border-bottom:1px solid rgba(255,255,255,0.03)}
+.history-item:active{background:rgba(0,229,255,0.1);color:var(--cyan)}
+.history-item:last-child{border-bottom:none}
+
+/* Number section - sum and input on same line, expression below */
+.col-right .num-top{display:flex;align-items:center;gap:6px}
+.num-display{font-size:16px;font-weight:700;color:var(--cyan);background:var(--surface);border-radius:6px;padding:7px 10px;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:center;letter-spacing:1px;min-width:50px}
+.num-input{width:70px;padding:7px 4px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:13px;text-align:center;font-weight:600;transition:all .15s;-webkit-appearance:none;flex-shrink:0}
+.num-input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,229,255,0.1)}
+.num-input::placeholder{color:var(--text2);font-weight:400;font-size:11px}
+.num-input::-webkit-inner-spin-button,.num-input::-webkit-outer-spin-button{-webkit-appearance:none}
+
+/* Total Card */
+.total-card{background:linear-gradient(135deg,rgba(0,229,255,0.1),rgba(0,230,118,0.08));border:1px solid rgba(0,229,255,0.4);border-radius:var(--radius);padding:14px;box-shadow:0 0 30px rgba(0,229,255,0.08)}
+.total-card .total-label{font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;text-align:center}
+.total-card .total-items{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.total-card .total-item{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:4px 8px;background:rgba(0,0,0,0.2);border-radius:6px}
+.total-card .total-item-text{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:10px}
+.total-card .total-item-sum{color:var(--cyan);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.total-card .total-value-label{font-size:11px;color:var(--text2);text-align:center;padding-top:8px;border-top:1px solid rgba(0,229,255,0.2);margin-bottom:4px}
+.total-card .total-value{font-size:28px;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;font-variant-numeric:tabular-nums}
+
+/* Empty State */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--text2)}
+.empty-state svg{width:56px;height:56px;margin-bottom:14px;opacity:0.3}
+.empty-state p{font-size:14px;margin-bottom:14px}
+
+/* Modal */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px;padding-bottom:calc(20px + var(--safe-bottom));width:100%;max-width:500px;max-height:70vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.5);animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal h3{font-size:16px;margin-bottom:14px;color:var(--cyan)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+
+/* Toast */
+.toast{position:fixed;bottom:calc(20px + var(--safe-bottom));left:50%;transform:translateX(-50%);padding:10px 18px;background:var(--card);border:1px solid var(--cyan);border-radius:var(--radius);color:var(--cyan);font-size:13px;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+
+/* Keyboard handling */
+@media(max-height:500px){
+  .header{padding:6px 12px}
+  .page-tabs{padding:4px 8px}
+  .content{padding:8px}
+  .column-card{padding:10px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>DATAFLOW</h1>
+  <div class="header-actions">
+    <button class="btn btn-sm" onclick="showSearchModal()">搜索</button>
+    <button class="btn btn-sm" onclick="exportExcel()">导出</button>
+    <button class="btn btn-sm" onclick="shareToWeChat()">分享</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-tabs" id="pageTabs"></div>
+  <div class="content" id="content"></div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'dataflow_data';
+
+function loadData() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (d && d.pages && d.pages.length) {
+      if (!d.textHistory) d.textHistory = [];
+      // Migrate old per-column history to global
+      d.pages.forEach(p => {
+        p.columns.forEach(c => {
+          if (c.textHistory && c.textHistory.length) {
+            c.textHistory.forEach(h => {
+              if (!d.textHistory.includes(h)) d.textHistory.push(h);
+            });
+            delete c.textHistory;
+          }
+        });
+      });
+      return d;
+    }
+  } catch(e) {}
+  return { pages: [createPage()], currentPageIndex: 0, textHistory: [] };
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+}
+
+function createPage() {
+  const now = new Date();
+  return {
+    id: formatDateId(now),
+    name: formatDateDisplay(now),
+    columns: [createColumn()]
+  };
+}
+
+function createColumn() {
+  return { textValue: '', numbers: [] };
+}
+
+function formatDateId(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0') + '_' +
+    String(d.getHours()).padStart(2,'0') + '-' +
+    String(d.getMinutes()).padStart(2,'0') + '-' +
+    String(d.getSeconds()).padStart(2,'0');
+}
+
+function formatDateDisplay(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0') + ' ' +
+    String(d.getHours()).padStart(2,'0') + ':' +
+    String(d.getMinutes()).padStart(2,'0') + ':' +
+    String(d.getSeconds()).padStart(2,'0');
+}
+
+let appData = loadData();
+let openHistoryIdx = null;
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function showModal(html) {
+  document.getElementById('modal').innerHTML = html;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function hideModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) hideModal();
+});
+
+function render() {
+  renderTabs();
+  renderContent();
+  saveData();
+}
+
+function renderTabs() {
+  const el = document.getElementById('pageTabs');
+  let html = '';
+  appData.pages.forEach((p, i) => {
+    html += `<div class="page-tab ${i === appData.currentPageIndex ? 'active' : ''}" onclick="switchPage(${i})">
+      ${p.name.substring(5,16)}<span class="tab-close" onclick="event.stopPropagation();deletePage(${i})"> x</span>
+    </div>`;
+  });
+  html += `<button class="btn btn-icon btn-sm" onclick="addPage()">+</button>`;
+  el.innerHTML = html;
+}
+
+function renderContent() {
+  const page = appData.pages[appData.currentPageIndex];
+  if (!page) return;
+  const el = document.getElementById('content');
+
+  if (!page.columns.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      <p>点击下方添加数据列</p>
+      <button class="btn btn-primary" onclick="addColumn()">+ 添加列</button>
+    </div>`;
+    return;
+  }
+
+  let grandTotal = 0;
+  let colSummaries = [];
+  page.columns.forEach((col, i) => {
+    const sum = col.numbers.reduce((a,b) => a+b, 0);
+    grandTotal += sum;
+    if (col.textValue || col.numbers.length) {
+      colSummaries.push({ text: col.textValue || `COL ${String(i+1).padStart(2,'0')}`, sum });
+    }
+  });
+
+  let html = '<div class="columns-list">';
+  page.columns.forEach((col, ci) => {
+    const sum = col.numbers.reduce((a,b) => a+b, 0);
+    const expr = col.numbers.length ? col.numbers.join(' + ') : '';
+    const historyOpen = openHistoryIdx === ci;
+
+    html += `<div class="column-card">
+      <div class="col-expr">${expr || '&nbsp;'}</div>
+      <button class="col-delete" onclick="deleteColumn(${ci})">x</button>
+      <div class="col-row">
+        <div class="col-left">
+          <div class="input-group">
+            <input class="text-input" type="text" value="${escapeHtml(col.textValue)}"
+              onchange="updateText(${ci}, this.value)"
+              onfocus="closeAllHistory()" placeholder="输入文字...">
+            <button class="text-history-btn" onclick="toggleHistory(${ci})">&#9660;</button>
+            <div class="history-dropdown ${historyOpen ? 'show' : ''}">
+              ${appData.textHistory.length ? `<div class="history-item" style="color:var(--red);font-size:11px;text-align:center" onclick="clearTextHistory()">清除历史记录</div>` + appData.textHistory.map(h =>
+                `<div class="history-item" onclick="selectHistory(${ci}, '${escapeHtml(h)}')">${escapeHtml(h)}</div>`
+              ).join('') : '<div class="history-item" style="color:var(--text2)">暂无历史</div>'}
+            </div>
+          </div>
+        </div>
+        <div class="col-right">
+          <div class="num-top">
+            <div class="num-display">${col.numbers.length ? sum : '0'}</div>
+            <input class="num-input" type="number" inputmode="decimal" placeholder="数字+回车"
+              onkeydown="if(event.key==='Enter'){addNumber(${ci}, this);event.preventDefault();}"
+              onblur="addNumber(${ci}, this)">
+          </div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  html += `<div class="total-card">
+    <div class="total-label">汇总</div>
+    <div class="total-items">
+      ${colSummaries.length ? colSummaries.map(s => `<div class="total-item"><span class="total-item-text">${escapeHtml(s.text)}</span><span class="total-item-sum">${s.sum}</span></div>`).join('') : '<div class="total-item"><span class="total-item-text" style="color:var(--text2)">暂无数据</span></div>'}
+    </div>
+    <div class="total-value-label">总计</div>
+    <div class="total-value">${grandTotal}</div>
+  </div>`;
+
+  if (page.columns.length < 30) {
+    html += `<button class="btn btn-primary" onclick="addColumn()" style="width:100%;justify-content:center;padding:14px;margin-top:4px">+ 添加列</button>`;
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function switchPage(i) {
+  openHistoryIdx = null;
+  appData.currentPageIndex = i;
+  render();
+}
+
+function addPage() {
+  openHistoryIdx = null;
+  appData.pages.push(createPage());
+  appData.currentPageIndex = appData.pages.length - 1;
+  render();
+}
+
+function deletePage(i) {
+  if (appData.pages.length <= 1) { showToast('至少保留一个页面'); return; }
+  showModal(`
+    <h3>确认删除</h3>
+    <p style="color:var(--text2);font-size:14px">删除 "${appData.pages[i].name}" ?</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="hideModal()">取消</button>
+      <button class="btn btn-danger" onclick="confirmDeletePage(${i})">删除</button>
+    </div>
+  `);
+}
+
+function confirmDeletePage(i) {
+  appData.pages.splice(i, 1);
+  if (appData.currentPageIndex >= appData.pages.length) appData.currentPageIndex = appData.pages.length - 1;
+  hideModal();
+  render();
+}
+
+function addColumn() {
+  const page = appData.pages[appData.currentPageIndex];
+  if (page.columns.length >= 30) { showToast('最多30列'); return; }
+  page.columns.push(createColumn());
+  render();
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.column-card');
+    if (cards.length) cards[cards.length-1].scrollIntoView({ behavior:'smooth', block:'end' });
+  }, 100);
+}
+
+function deleteColumn(ci) {
+  const page = appData.pages[appData.currentPageIndex];
+  page.columns.splice(ci, 1);
+  openHistoryIdx = null;
+  render();
+}
+
+function updateText(ci, val) {
+  const page = appData.pages[appData.currentPageIndex];
+  const col = page.columns[ci];
+  col.textValue = val;
+  if (val.trim() && !appData.textHistory.includes(val.trim())) {
+    appData.textHistory.unshift(val.trim());
+    if (appData.textHistory.length > 50) appData.textHistory.pop();
+  }
+  saveData();
+}
+
+function clearTextHistory() {
+  appData.textHistory = [];
+  openHistoryIdx = null;
+  render();
+  showToast('历史记录已清除');
+}
+
+function toggleHistory(ci) {
+  openHistoryIdx = openHistoryIdx === ci ? null : ci;
+  renderContent();
+  saveData();
+}
+
+function closeAllHistory() {
+  if (openHistoryIdx !== null) { openHistoryIdx = null; renderContent(); }
+}
+
+function selectHistory(ci, val) {
+  const page = appData.pages[appData.currentPageIndex];
+  page.columns[ci].textValue = val;
+  openHistoryIdx = null;
+  render();
+}
+
+function addNumber(ci, input) {
+  const val = parseFloat(input.value);
+  if (isNaN(val) || input.value === '') return;
+  const page = appData.pages[appData.currentPageIndex];
+  page.columns[ci].numbers.push(val);
+  input.value = '';
+  render();
+}
+
+function showSearchModal() {
+  showModal(`
+    <h3>按日期搜索</h3>
+    <input type="date" id="searchDateInput" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:15px;margin-top:8px">
+    <div class="modal-actions">
+      <button class="btn" onclick="hideModal()">取消</button>
+      <button class="btn btn-primary" onclick="searchByDate()">搜索</button>
+    </div>
+  `);
+}
+
+function searchByDate() {
+  const dateVal = document.getElementById('searchDateInput').value;
+  if (!dateVal) { showToast('请选择日期'); return; }
+  const results = appData.pages.filter(p => p.id.startsWith(dateVal));
+  if (!results.length) {
+    showModal(`
+      <h3>搜索结果</h3>
+      <p style="color:var(--text2);font-size:14px">未找到 ${dateVal} 的数据</p>
+      <div class="modal-actions"><button class="btn btn-primary" onclick="hideModal()">确定</button></div>
+    `);
+    return;
+  }
+  let listHtml = results.map(p => {
+    const idx = appData.pages.indexOf(p);
+    return `<div class="history-item" onclick="switchPage(${idx});hideModal()">${p.name}</div>`;
+  }).join('');
+  showModal(`
+    <h3>${dateVal} 的页面</h3>
+    <div style="margin-top:8px">${listHtml}</div>
+    <div class="modal-actions"><button class="btn" onclick="hideModal()">关闭</button></div>
+  `);
+}
+
+function exportExcel() {
+  const page = appData.pages[appData.currentPageIndex];
+  const wsData = [['列', '文字', '数字明细', '求和']];
+
+  page.columns.forEach((col, i) => {
+    const sum = col.numbers.reduce((a,b) => a+b, 0);
+    wsData.push(['COL ' + String(i+1).padStart(2,'0'), col.textValue, col.numbers.join('+'), sum]);
+  });
+
+  const grandTotal = page.columns.reduce((acc, col) => acc + col.numbers.reduce((a,b) => a+b, 0), 0);
+  wsData.push([]);
+  wsData.push(['总计', '', '', grandTotal]);
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [{ wch: 10 }, { wch: 20 }, { wch: 30 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws, page.name.replace(/:/g, '-'));
+
+  const filename = page.name.replace(/:/g, '-').replace(/ /g, '_') + '.xlsx';
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+  const dataUri = 'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + wbout;
+
+  // Trigger download via hidden link (works with Android WebView DownloadListener)
+  const a = document.createElement('a');
+  a.href = dataUri;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  showToast('已导出: ' + filename);
+}
+
+function shareToWeChat() {
+  const page = appData.pages[appData.currentPageIndex];
+  let text = page.name + '\n\n';
+
+  page.columns.forEach((col, i) => {
+    const sum = col.numbers.reduce((a,b) => a+b, 0);
+    text += `COL ${String(i+1).padStart(2,'0')}\n`;
+    if (col.textValue) text += `文字: ${col.textValue}\n`;
+    if (col.numbers.length) text += `数字: ${col.numbers.join('+')} = ${sum}\n`;
+    text += '\n';
+  });
+
+  const grandTotal = page.columns.reduce((acc, col) => acc + col.numbers.reduce((a,b) => a+b, 0), 0);
+  text += `总计: ${grandTotal}`;
+
+  // Android native share
+  if (typeof AppBridge !== 'undefined' && AppBridge.shareText) {
+    AppBridge.shareText(text);
+  } else if (navigator.share) {
+    navigator.share({ title: page.name, text: text }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showToast('已复制，可粘贴到微信'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('已复制，可粘贴到微信');
+  }
+}
+
+// Close history on outside click
+document.addEventListener('click', function(e) {
+  if (openHistoryIdx !== null && !e.target.closest('.text-input-wrap') && !e.target.closest('.text-history-btn')) {
+    openHistoryIdx = null;
+    renderContent();
+  }
+});
+
+render();
+
+// Auto-save on page close / switch to background
+window.addEventListener('beforeunload', saveData);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveData();
+});
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "DataFlow",
+  "short_name": "DataFlow",
+  "description": "数据流 - 快速记录与统计",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#0a0e17",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230a0e17' width='100' height='100' rx='20'/><text x='50' y='62' text-anchor='middle' font-size='40' font-weight='bold' fill='%2300e5ff'>DF</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
