@@ -1,8 +1,12 @@
 node_modules/
 .gradle/
-build/
+**/build/
 local.properties
 *.apk
 *.iml
 .idea/
 .DS_Store
+*.hprof
+.captures/
+.externalNativeBuild/
+.cxx/
